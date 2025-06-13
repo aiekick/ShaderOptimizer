@@ -1,0 +1,21 @@
+name: Full sources
+
+on:
+  push:
+    branches:
+    - app
+
+jobs:
+  full_sources:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        ref: app
+    - name: checkout submodules
+      run : git submodule update --init --recursive 
+    - name: upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: ShaderOptimizer
+        path: .

@@ -1,0 +1,1 @@
+cmd /k "glslangValidator -G --aml test.frag -H -Od > test.frag.spv"

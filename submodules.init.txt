@@ -1,0 +1,2 @@
+git submodule add --force -b "master" https://github.com/aiekick/BuildInc.git 3rdparty/buildinc
+git submodule add --force -b "master" https://github.com/aiekick/ImGuiPack.git 3rdparty/imguipack
