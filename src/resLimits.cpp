@@ -40,7 +40,7 @@
 #include <sstream>
 #include <cctype>
 
-#include <core/resLimits.h>
+#include <resLimits.h>
 #include <ezlibs/ezLog.hpp>
 
 namespace glslang {

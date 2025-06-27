@@ -67,12 +67,15 @@ include(cmake/ezlibs.cmake)
 include(cmake/glslang.cmake)
 
 # App Sources
-file(GLOB_RECURSE SRC_SOURCES ${CMAKE_SOURCE_DIR}/src/*.*)
-source_group(TREE ${CMAKE_SOURCE_DIR}/src PREFIX src FILES ${SRC_SOURCES})
+file(GLOB_RECURSE SRC_SOURCES 
+	${CMAKE_CURRENT_SOURCE_DIR}/src/*.* 
+	${CMAKE_CURRENT_SOURCE_DIR}/include/*.*
+)
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SRC_SOURCES})
 
 # cmake Sources for have it the visual studio tree of the App
-file(GLOB_RECURSE CMAKE_SOURCES ${CMAKE_SOURCE_DIR}/cmake/*.cmake)
-source_group(TREE ${CMAKE_SOURCE_DIR}/cmake PREFIX cmake FILES ${CMAKE_SOURCES})
+file(GLOB_RECURSE CMAKE_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/cmake/*.cmake)
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/cmake PREFIX cmake FILES ${CMAKE_SOURCES})
 
 add_library(${PROJECT} 
 	${SRC_SOURCES}
@@ -80,10 +83,13 @@ add_library(${PROJECT}
 	${EZ_LIBS_SOURCES}
 )
 
-target_include_directories(${PROJECT}  
+set(SHADER_OPT_INCLUDES 
+	${CMAKE_CURRENT_SOURCE_DIR}/include
 	${GLSLANG_INCLUDE_DIRS}
 	${EZLIBS_INCLUDE_DIR}
 )
+set(SHADER_OPT_INCLUDES ${SHADER_OPT_INCLUDES} PARENT_SCOPE)
+target_include_directories(${PROJECT} PRIVATE ${SHADER_OPT_INCLUDES})
 
 target_link_libraries(${PROJECT} 
 	${GLSLANG_LIBRARIES}

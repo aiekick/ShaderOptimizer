@@ -17,10 +17,10 @@ limitations under the License.
 // This is an independent project of an individual developer. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 
-#include <core/shaderCompiler.h>
+#include <shaderCompiler.h>
+#include <resLimits.h>
+#include <uniformsIRLocator.h>
 
-#include <core/resLimits.h>
-#include <core/uniformsIRLocator.h>
 #include <ezlibs/ezLog.hpp>
 
 #include <SPIRV/GLSL.std.450.h>

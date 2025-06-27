@@ -1,7 +1,6 @@
-#include <core/controller.h>
-
-#include <core/resLimits.h>
-#include <core/uniformsIRLocator.h>
+#include <controller.h>
+#include <resLimits.h>
+#include <uniformsIRLocator.h>
 
 #include <SPIRV/GLSL.std.450.h>
 #include <SPIRV/GlslangToSpv.h>
