@@ -1,4 +1,4 @@
-set(EZLIBS_INCLUDE_DIR ${CMAKE_SOURCE_DIR}/3rdparty/ezlibs/include)
+set(EZLIBS_INCLUDE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/ezlibs/include)
 
 set(USE_EZ_LIBS_TESTING ${USE_BUILDING_OF_TESTS} CACHE BOOL "" FORCE)
 set(TESTING_APP ON CACHE BOOL "" FORCE)
@@ -23,4 +23,4 @@ set(EZ_LIBS_SOURCES ${EZ_LIBS_SOURCES})
 
 include_directories(${EZLIBS_INCLUDE_DIR})
 
-add_subdirectory(${CMAKE_SOURCE_DIR}/3rdparty/ezlibs)
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/ezlibs)
