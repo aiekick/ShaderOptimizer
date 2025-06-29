@@ -37,8 +37,8 @@ public:
 public:
     TUniformsIRLocator();
 
-    virtual bool visitBinary(glslang::TVisit, glslang::TIntermBinary* vNode);
-    virtual void visitSymbol(glslang::TIntermSymbol* vNode);
+    bool visitBinary(glslang::TVisit, glslang::TIntermBinary* vNode) override;
+    void visitSymbol(glslang::TIntermSymbol* vNode) override;
 
 protected:
     TUniformsIRLocator(TUniformsIRLocator&);

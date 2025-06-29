@@ -20,6 +20,7 @@ limitations under the License.
 #include <ShaderOpt/shaderCompiler.h>
 #include <ShaderOpt/resLimits.h>
 #include <ShaderOpt/uniformsIRLocator.h>
+#include <ShaderOpt/flopTraverser.h>
 
 #include <ezlibs/ezLog.hpp>
 
@@ -47,6 +48,7 @@ ShaderCompiler::SpirvCode ShaderCompiler::CompileGLSLString(
     const EShLanguage& vShaderType,
     const ShaderEntryPoint& vEntryPoint,
     ShaderMessagingFunction vMessagingFunction,
+    TraverserFunction vTraverser,
     std::string* vShaderCode,
     std::unordered_map<std::string, bool>* vUsedUniforms) {
     m_errors.clear();
@@ -176,10 +178,18 @@ ShaderCompiler::SpirvCode ShaderCompiler::CompileGLSLString(
         }
 
         if (vUsedUniforms) {
-            auto usedUniforms = CollectUniformInfosFromIR(*Shader.getIntermediate());
+            auto usedUniforms = m_collectUniformInfosFromIR(*Shader.getIntermediate());
             for (auto u : usedUniforms) {
                 (*vUsedUniforms)[u.first] |= u.second;
             }
+        }
+
+        {
+            double worstFlops = m_computeFlops(*Shader.getIntermediate());
+        }
+
+        if (vTraverser) {
+            vTraverser(Shader.getIntermediate());
         }
 
         spv::SpvBuildLogger logger;
@@ -206,103 +216,7 @@ ShaderCompiler::SpirvCode ShaderCompiler::CompileGLSLString(
     return SpirV;
 }
 
-void ShaderCompiler::ParseGLSLString(
-    const std::string& vCode,
-    const std::string& vShaderSuffix,
-    const ShaderEntryPoint& vEntryPoint,
-    ShaderMessagingFunction vMessagingFunction,
-    TraverserFunction vTraverser) {
-    std::string InputGLSL = vCode;
-
-    EShLanguage shaderType = m_getShaderStage(vShaderSuffix);
-
-    if (!InputGLSL.empty() && shaderType != EShLanguage::EShLangCount) {
-        const char* InputCString = InputGLSL.c_str();
-
-        glslang::TShader Shader(shaderType);
-        Shader.setStrings(&InputCString, 1);
-
-        // Set up Vulkan/SpirV Environment
-        int ClientInputSemanticsVersion = 100;                                               // maps to, say, #define VULKAN 100
-        glslang::EShTargetClientVersion VulkanClientVersion = glslang::EShTargetVulkan_1_0;  // would map to, say, Vulkan 1.0
-        glslang::EShTargetLanguageVersion TargetVersion = glslang::EShTargetSpv_1_0;         // maps to, say, SPIR-V 1.0
-
-        Shader.setEnvInput(glslang::EShSourceGlsl, shaderType, glslang::EShClientVulkan, ClientInputSemanticsVersion);
-        Shader.setEnvClient(glslang::EShClientVulkan, VulkanClientVersion);
-        Shader.setEnvTarget(glslang::EShTargetSpv, TargetVersion);
-        auto entry = vEntryPoint;
-        if (entry.empty())
-            entry = "main";
-        Shader.setEntryPoint(entry.c_str());
-        Shader.setSourceEntryPoint("main");
-
-        EShMessages messages = (EShMessages)(EShMsgAST);
-
-        const int DefaultVersion = 110;  // 110 for desktop, 100 for es
-
-        DirStackFileIncluder Includer;
-
-        std::string PreprocessedGLSL;
-
-        std::string shaderTypeString = m_getFullShaderStageString(shaderType);
-
-        if (!Shader.preprocess(&glslang::DefaultTBuiltInResource, DefaultVersion, ENoProfile, false, false, messages, &PreprocessedGLSL, Includer)) {
-            LogVarError("Debug : GLSL stage %s Preprocessing Failed", vShaderSuffix.c_str());
-            LogVarError("Debug : %s", Shader.getInfoLog());
-            LogVarError("Debug : %s", Shader.getInfoDebugLog());
-
-            std::string log = Shader.getInfoLog();
-            if (!log.empty()) {
-                m_errors[shaderType].push_back(log);
-                if (vMessagingFunction) {
-                    vMessagingFunction("Preprocessing Errors", shaderTypeString, log);
-                }
-            }
-            m_warnings.clear();
-        } else {
-            m_errors.clear();
-            std::string log = Shader.getInfoLog();
-            if (!log.empty()) {
-                m_warnings[shaderType].push_back(log);
-                if (vMessagingFunction) {
-                    vMessagingFunction("Preprocessing Warnings", shaderTypeString, log);
-                }
-            }
-        }
-
-        const char* PreprocessedCStr = PreprocessedGLSL.c_str();
-        Shader.setStrings(&PreprocessedCStr, 1);
-
-        if (!Shader.parse(&glslang::DefaultTBuiltInResource, 100, false, messages)) {
-            LogVarError("Debug : GLSL stage %s Parse Failed", vShaderSuffix.c_str());
-            LogVarError("Debug : %s", Shader.getInfoLog());
-            LogVarError("Debug : %s", Shader.getInfoDebugLog());
-            std::string log = Shader.getInfoLog();
-            if (!log.empty()) {
-                m_errors[shaderType].push_back(log);
-                if (vMessagingFunction) {
-                    vMessagingFunction("Parse Errors", shaderTypeString, log);
-                }
-            }
-            m_warnings.clear();
-        } else {
-            m_errors.clear();
-            std::string log = Shader.getInfoLog();
-            if (!log.empty()) {
-                m_warnings[shaderType].push_back(log);
-                if (vMessagingFunction) {
-                    vMessagingFunction("Parse Warnings", shaderTypeString, log);
-                }
-            }
-        }
-
-        if (vTraverser) {
-            vTraverser(Shader.getIntermediate());
-        }
-    }
-}
-
-std::unordered_map<std::string, bool> ShaderCompiler::CollectUniformInfosFromIR(const glslang::TIntermediate& intermediate) {
+std::unordered_map<std::string, bool> ShaderCompiler::m_collectUniformInfosFromIR(const glslang::TIntermediate& intermediate) {
     auto* root_ptr = intermediate.getTreeRoot();
     if (root_ptr == nullptr) {
         return {};
@@ -310,6 +224,16 @@ std::unordered_map<std::string, bool> ShaderCompiler::CollectUniformInfosFromIR(
     TUniformsIRLocator it;
     root_ptr->traverse(&it);
     return it.usedUniforms;
+}
+
+double ShaderCompiler::m_computeFlops(const glslang::TIntermediate& intermediate) {
+    auto* root_ptr = intermediate.getTreeRoot();
+    if (root_ptr == nullptr) {
+        return {};
+    }
+    FlopTraverser it;
+    root_ptr->traverse(&it);
+    return it.worstFlops();
 }
 
 std::string ShaderCompiler::m_getSuffix(const std::string& name) {

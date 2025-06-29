@@ -45,7 +45,7 @@ public:
     typedef std::vector<uint32_t> SpirvCode;
     typedef std::unordered_map<EShLanguage, std::vector<std::string>> ShaderInfos;
 
-private: 
+private:
     ShaderInfos m_errors;
     ShaderInfos m_warnings;
 
@@ -55,15 +55,13 @@ public:
         const EShLanguage& vShaderType,
         const ShaderEntryPoint& vEntryPoint = "main",
         ShaderMessagingFunction vMessagingFunction = nullptr,
+        TraverserFunction vTraverser = nullptr,
         std::string* vShaderCode = nullptr,
         std::unordered_map<std::string, bool>* vUsedUniforms = nullptr);
-    void ParseGLSLString(
-        const std::string& vCode,
-        const std::string& vShaderSuffix,
-        const ShaderEntryPoint& vEntryPoint,
-        ShaderMessagingFunction vMessagingFunction,
-        TraverserFunction vTraverser);
-    std::unordered_map<std::string, bool> CollectUniformInfosFromIR(const glslang::TIntermediate& intermediate);
+
+private:
+    std::unordered_map<std::string, bool> m_collectUniformInfosFromIR(const glslang::TIntermediate& intermediate);
+    double m_computeFlops(const glslang::TIntermediate& intermediate);
 
 private:
     std::string m_getSuffix(const std::string& name);

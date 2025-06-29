@@ -1,6 +1,7 @@
 #include <ShaderOpt/controller.h>
 #include <ShaderOpt/resLimits.h>
 #include <ShaderOpt/uniformsIRLocator.h>
+#include <ShaderOpt/flopEstimator.h>
 
 #include <SPIRV/GLSL.std.450.h>
 #include <SPIRV/GlslangToSpv.h>
@@ -55,33 +56,55 @@ inline float asFloat(std::uint32_t bits) {
     return value;
 }
 
-bool Controller::optimize(const Controller::Config& vInfos) {
+Controller::Result Controller::optimize(const Controller::Config& vInfos) {
     try {
         ShaderCompiler compiler;
-        const auto spirv = compiler.CompileGLSLString(m_sourceCode, EShLangFragment);
-        if (spirv.empty()) {
-            return false;
+        Controller::Result ret;
+        if (vInfos.outputType != Config::OutputType::AST) {
+            const auto spirv = compiler.CompileGLSLString(m_sourceCode, EShLangFragment);
+            if (spirv.empty()) {
+                return {};
+            }
+            switch (vInfos.outputType) {
+                case Config::OutputType::GLSL: {
+                    ret.result = m_convertToGlslCode(spirv);
+                } break;
+                case Config::OutputType::HLSL: {
+                    ret.result = m_convertToHlslCode(spirv);
+                } break;
+                case Config::OutputType::MSL: {
+                    ret.result = m_convertToMslCode(spirv);
+                } break;
+                case Config::OutputType::CPP: {
+                    ret.result = m_convertToCppCode(spirv);
+                } break;
+                case Config::OutputType::SPIRV: {
+                    ret.result = m_convertToHumanReadableSpirv(spirv);
+                    ret.stats = FlopEstimator(ret.result).stats();
+                } break;
+                case Config::OutputType::Count:
+                default: break;
+            }
+        } else {
+            TInfoSink sink;
+            compiler.CompileGLSLString(m_sourceCode, EShLangFragment, "main", nullptr, [&](glslang::TIntermediate* vIt) {
+                if (vIt != nullptr) {
+                    vIt->output(sink, true);
+                }
+            });
+            ret.result = sink.debug.c_str();
         }
-        std::string result;
-        switch (vInfos.outputType) {
-            case Config::OutputType::GLSL: result = m_convertToGlslCode(spirv); break;
-            case Config::OutputType::HLSL: result = m_convertToHlslCode(spirv); break;
-            case Config::OutputType::MSL: result = m_convertToMslCode(spirv); break;
-            case Config::OutputType::CPP: result = m_convertToCppCode(spirv); break;
-            case Config::OutputType::SPIRV: result = m_convertToHumanReadableSpirv(spirv); break;
-            case Config::OutputType::Count:
-            default: break;
-        }
-        if (!result.empty()) {
-            setTarget(result);
-            return true;
+        if (!ret.result.empty()) {
+            setTarget(ret.result);
+            ret.valid = true;
+            return ret;
         }
     } catch (const std::exception& ex) {
         LogVarError("Error on exception : %s", ex.what());
     } catch (...) {
         LogVarError("Unknow Error on exception");
     }
-    return false;
+    return {};
 }
 
 std::string Controller::m_convertToHumanReadableSpirv(const ShaderCompiler::SpirvCode& vSpirvCode) {
