@@ -6,3 +6,7 @@
 	path = 3rdparty/glslang
 	url = https://github.com/KhronosGroup/glslang.git
 	branch = main
+[submodule "3rdparty/spirvcross"]
+	path = 3rdparty/spirvcross
+	url = https://github.com/KhronosGroup/SPIRV-Cross.git
+	branch = main

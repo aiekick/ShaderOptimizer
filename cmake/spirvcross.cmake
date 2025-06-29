@@ -1,0 +1,46 @@
+	
+set(SPIRV_CROSS_SHARED OFF CACHE BOOL "" FORCE)
+set(SPIRV_CROSS_STATIC ON CACHE BOOL "" FORCE)
+set(SPIRV_CROSS_CLI OFF CACHE BOOL "" FORCE)
+set(SPIRV_CROSS_ENABLE_TESTS OFF CACHE BOOL "" FORCE)
+
+set(SPIRV_CROSS_ENABLE_GLSL ON CACHE BOOL "" FORCE)
+set(SPIRV_CROSS_ENABLE_HLSL ON CACHE BOOL "" FORCE)
+set(SPIRV_CROSS_ENABLE_MSL ON CACHE BOOL "" FORCE)
+set(SPIRV_CROSS_ENABLE_CPP ON CACHE BOOL "" FORCE)
+set(SPIRV_CROSS_ENABLE_C_API OFF CACHE BOOL "" FORCE)
+set(SPIRV_CROSS_ENABLE_UTIL ON CACHE BOOL "" FORCE)
+
+set(SPIRV_CROSS_SKIP_INSTALL OFF CACHE BOOL "" FORCE)
+
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/spirvcross EXCLUDE_FROM_ALL)
+
+set(SPIRV_CROSS_LIBRARIES)
+if (TARGET spirv-cross-core)
+	set_target_properties(spirv-cross-core PROPERTIES FOLDER 3rdparty/Static/SpirvCross)
+	set(SPIRV_CROSS_LIBRARIES ${SPIRV_CROSS_LIBRARIES} spirv-cross-core)
+endif()
+if (TARGET spirv-cross-glsl)
+	set_target_properties(spirv-cross-glsl PROPERTIES FOLDER 3rdparty/Static/SpirvCross)
+	set(SPIRV_CROSS_LIBRARIES ${SPIRV_CROSS_LIBRARIES} spirv-cross-glsl)
+endif()
+if (TARGET spirv-cross-hlsl)
+	set_target_properties(spirv-cross-hlsl PROPERTIES FOLDER 3rdparty/Static/SpirvCross)
+	set(SPIRV_CROSS_LIBRARIES ${SPIRV_CROSS_LIBRARIES} spirv-cross-hlsl)
+endif()
+if (TARGET spirv-cross-cpp)
+	set_target_properties(spirv-cross-cpp PROPERTIES FOLDER 3rdparty/Static/SpirvCross)
+	set(SPIRV_CROSS_LIBRARIES ${SPIRV_CROSS_LIBRARIES} spirv-cross-cpp)
+endif()
+if (TARGET spirv-cross-msl)
+	set_target_properties(spirv-cross-msl PROPERTIES FOLDER 3rdparty/Static/SpirvCross)
+	set(SPIRV_CROSS_LIBRARIES ${SPIRV_CROSS_LIBRARIES} spirv-cross-msl)
+endif()
+if (TARGET spirv-cross-util)
+	set_target_properties(spirv-cross-util PROPERTIES FOLDER 3rdparty/Static/SpirvCross)
+	set(SPIRV_CROSS_LIBRARIES ${SPIRV_CROSS_LIBRARIES} spirv-cross-util)
+endif()
+
+set(SPIRV_CROSS_INCLUDE_DIRS 
+	${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/spirvcross
+)

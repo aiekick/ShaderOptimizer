@@ -65,6 +65,7 @@ endif()
 
 include(cmake/ezlibs.cmake)
 include(cmake/glslang.cmake)
+include(cmake/spirvcross.cmake)
 
 # App Sources
 file(GLOB_RECURSE SRC_SOURCES 
@@ -85,6 +86,7 @@ add_library(${PROJECT}
 
 set(SHADER_OPT_INCLUDES 
 	${CMAKE_CURRENT_SOURCE_DIR}/include
+	${SPIRV_CROSS_INCLUDE_DIRS}
 	${GLSLANG_INCLUDE_DIRS}
 	${EZLIBS_INCLUDE_DIR}
 )
@@ -93,6 +95,7 @@ target_include_directories(${PROJECT} PRIVATE ${SHADER_OPT_INCLUDES})
 
 target_link_libraries(${PROJECT} 
 	${GLSLANG_LIBRARIES}
+	${SPIRV_CROSS_LIBRARIES}
 )
 
 set_target_properties(${PROJECT} PROPERTIES OUTPUT_NAME "${PROJECT}_${CMAKE_SYSTEM_NAME}_${ARCH}")

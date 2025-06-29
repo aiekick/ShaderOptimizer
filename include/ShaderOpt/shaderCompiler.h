@@ -21,17 +21,20 @@ limitations under the License.
 #include <glslang/Include/intermediate.h>
 
 #include <unordered_map>
-#include <string>
 #include <functional>
+#include <cstdint>
+#include <string>
 #include <vector>
+#include <array>
+#include <list>
 #include <map>
 #include <set>
-#include <list>
-#include <array>
 
 /*
 todo : to Refactor and Convert for use of Vulkan.hpp
 */
+
+namespace ShaderOpt {
 
 typedef std::string ShaderEntryPoint;
 
@@ -39,22 +42,17 @@ class ShaderCompiler {
 public:
     typedef std::function<void(std::string, std::string, std::string)> ShaderMessagingFunction;
     typedef std::function<void(glslang::TIntermediate*)> TraverserFunction;
+    typedef std::vector<uint32_t> SpirvCode;
+    typedef std::unordered_map<EShLanguage, std::vector<std::string>> ShaderInfos;
 
-private:  // errors
-    std::unordered_map<EShLanguage, std::vector<std::string>> m_errors;
-    std::unordered_map<EShLanguage, std::vector<std::string>> m_warnings;
+private: 
+    ShaderInfos m_errors;
+    ShaderInfos m_warnings;
 
 public:
-    const std::vector<unsigned int> CompileGLSLFile(
-        const std::string& filename,
-        const ShaderEntryPoint& vEntryPoint = "main",
-        ShaderMessagingFunction vMessagingFunction = nullptr,
-        std::string* vShaderCode = nullptr,
-        std::unordered_map<std::string, bool>* vUsedUniforms = nullptr);
-    const std::vector<unsigned int> CompileGLSLString(
+    SpirvCode CompileGLSLString(
         const std::string& vCode,
-        const std::string& vShaderSuffix,
-        const std::string& vOriginalFileName,
+        const EShLanguage& vShaderType,
         const ShaderEntryPoint& vEntryPoint = "main",
         ShaderMessagingFunction vMessagingFunction = nullptr,
         std::string* vShaderCode = nullptr,
@@ -62,7 +60,6 @@ public:
     void ParseGLSLString(
         const std::string& vCode,
         const std::string& vShaderSuffix,
-        const std::string& vOriginalFileName,
         const ShaderEntryPoint& vEntryPoint,
         ShaderMessagingFunction vMessagingFunction,
         TraverserFunction vTraverser);
@@ -75,3 +72,4 @@ private:
     std::string m_getFullShaderStageString(const EShLanguage& stage);
 };
 
+}  // namespace ShaderOpt

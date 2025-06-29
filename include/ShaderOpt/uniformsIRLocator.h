@@ -28,6 +28,8 @@ limitations under the License.
 // but for the moment we ddont search to know if the uniform is really used
 // by ex if at end its value is consumed by nothing
 
+namespace ShaderOpt {
+
 class TUniformsIRLocator : public glslang::TIntermTraverser {
 public:
     std::unordered_map<std::string, bool> usedUniforms;
@@ -42,3 +44,5 @@ protected:
     TUniformsIRLocator(TUniformsIRLocator&);
     TUniformsIRLocator& operator=(TUniformsIRLocator&);
 };
+
+}  // namespace ShaderOpt

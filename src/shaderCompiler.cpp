@@ -17,9 +17,9 @@ limitations under the License.
 // This is an independent project of an individual developer. Dear PVS-Studio, please check it.
 // PVS-Studio Static Code Analyzer for C, C++ and C#: http://www.viva64.com
 
-#include <shaderCompiler.h>
-#include <resLimits.h>
-#include <uniformsIRLocator.h>
+#include <ShaderOpt/shaderCompiler.h>
+#include <ShaderOpt/resLimits.h>
+#include <ShaderOpt/uniformsIRLocator.h>
 
 #include <ezlibs/ezLog.hpp>
 
@@ -27,6 +27,7 @@ limitations under the License.
 #include <SPIRV/GlslangToSpv.h>
 #include <glslang/Include/ShHandle.h>
 #include <glslang/OSDependent/osinclude.h>
+#include <glslang/MachineIndependent/Initialize.h>
 #include <StandAlone/DirStackFileIncluder.h>
 
 #include <cstdio>     // printf, fprintf
@@ -39,81 +40,44 @@ limitations under the License.
 
 #define VERBOSE_DEBUG
 
-// TODO: Multithread, manage SpirV that doesn't need recompiling (only recompile when dirty)
-const std::vector<unsigned int> ShaderCompiler::CompileGLSLFile(const std::string& filename,
+namespace ShaderOpt {
+
+ShaderCompiler::SpirvCode ShaderCompiler::CompileGLSLString(
+    const std::string& vCode,
+    const EShLanguage& vShaderType,
     const ShaderEntryPoint& vEntryPoint,
     ShaderMessagingFunction vMessagingFunction,
     std::string* vShaderCode,
     std::unordered_map<std::string, bool>* vUsedUniforms) {
-
-    std::vector<unsigned int> SpirV;
-
-    // Load GLSL into a string
-    std::ifstream file(filename);
-
-    if (!file.is_open()) {
-        LogVarError("Debug : Failed to load shader %s", filename.c_str());
-        return SpirV;
-    }
-
-    std::string InputGLSL((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
-
-    file.close();
-
-    if (!InputGLSL.empty()) {
-        if (vShaderCode)
-            *vShaderCode = InputGLSL;
-
-        return CompileGLSLString(InputGLSL, m_getSuffix(filename), filename, vEntryPoint, vMessagingFunction, vShaderCode, vUsedUniforms);
-    }
-
-    return SpirV;
-}
-
-const std::vector<unsigned int> ShaderCompiler::CompileGLSLString(const std::string& vCode,
-    const std::string& vShaderSuffix,
-    const std::string& vOriginalFileName,
-    const ShaderEntryPoint& vEntryPoint,
-    ShaderMessagingFunction vMessagingFunction,
-    std::string* vShaderCode,
-    std::unordered_map<std::string, bool>* vUsedUniforms) {
-
     m_errors.clear();
     m_warnings.clear();
 
-    std::vector<unsigned int> SpirV;
+    SpirvCode SpirV;
 
     std::string InputGLSL = vCode;
 
-    EShLanguage shaderType = m_getShaderStage(vShaderSuffix);
+    std::string shaderTypeString = m_getFullShaderStageString(vShaderType);
 
-    if (!InputGLSL.empty() && shaderType != EShLanguage::EShLangCount) {
-        glslang::TShader Shader(shaderType);
+    if (!InputGLSL.empty() && vShaderType != EShLanguage::EShLangCount) {
+        glslang::TShader Shader(vShaderType);
 
         if (vShaderCode)
             *vShaderCode = InputGLSL;
 
         // Set up Vulkan/SpirV Environment
-        int ClientInputSemanticsVersion = 100;  // maps to, say, #define VULKAN 100
-        // glslang::EShTargetClientVersion VulkanClientVersion = glslang::EShTargetVulkan_1_0;  // would map to, say, Vulkan 1.0
-        // glslang::EShTargetLanguageVersion TargetVersion = glslang::EShTargetSpv_1_0;    // maps to, say, SPIR-V 1.0
-
-        // RTX SUpport
-        glslang::EShTargetClientVersion VulkanClientVersion = glslang::EShTargetVulkan_1_2;  // would map to, say, Vulkan 1.0
-        glslang::EShTargetLanguageVersion TargetVersion = glslang::EShTargetSpv_1_4;         // maps to, say, SPIR-V 1.0
-
-        Shader.setEnvInput(glslang::EShSourceGlsl, shaderType, glslang::EShClientVulkan, ClientInputSemanticsVersion);
-        Shader.setEnvClient(glslang::EShClientVulkan, VulkanClientVersion);
-        Shader.setEnvTarget(glslang::EShTargetSpv, TargetVersion);
+        int ClientInputSemanticsVersion = 100;
+        Shader.setEnvInput(glslang::EShSourceGlsl, vShaderType, glslang::EShClientOpenGL, ClientInputSemanticsVersion);
+        Shader.setEnvClient(glslang::EShClientOpenGL, glslang::EShTargetOpenGL_450);
+        Shader.setAutoMapLocations(true);
 
         const char* InputCString = InputGLSL.c_str();
 
         Shader.setStrings(&InputCString, 1);
 
-        EShMessages messages = (EShMessages)(EShMsgSpvRules | EShMsgVulkanRules);
+        EShMessages messages = (EShMessages)(EShMsgDefault);
 
 #ifdef _DEBUG
-        messages = (EShMessages)(messages | EShMsgDebugInfo);
+        //messages = (EShMessages)(messages | EShMsgDebugInfo);
 #endif
 
         const int DefaultVersion = 110;  // 110 for desktop, 100 for es
@@ -122,29 +86,16 @@ const std::vector<unsigned int> ShaderCompiler::CompileGLSLString(const std::str
 
         std::string PreprocessedGLSL;
 
-        std::string shaderTypeString = m_getFullShaderStageString(shaderType);
-
         if (!Shader.preprocess(&glslang::DefaultTBuiltInResource, DefaultVersion, ENoProfile, false, false, messages, &PreprocessedGLSL, Includer)) {
-            LogVarError("Debug Preprocessing : GLSL stage %s Preprocessing Failed for : %s", vShaderSuffix.c_str(), vOriginalFileName.c_str());
-
+            LogVarError("Debug Preprocessing : GLSL stage %s Preprocessing Failed", shaderTypeString.c_str());
             std::string log = Shader.getInfoLog();
             if (!log.empty()) {
                 LogVarDebugInfo("Debug Preprocessing Errors : %s", log.c_str());
-                m_errors[shaderType].push_back(log);
+                m_errors[vShaderType].push_back(log);
                 if (vMessagingFunction) {
                     vMessagingFunction("Preprocessing Errors", shaderTypeString, log);
                 }
             }
-#ifdef VERBOSE_DEBUG
-            log = Shader.getInfoDebugLog();
-            if (!log.empty()) {
-                LogVarError("Debug Preprocessing Errors : %s", log.c_str());
-                m_errors[shaderType].push_back(log);
-                if (vMessagingFunction) {
-                    vMessagingFunction("Preprocessing Errors", shaderTypeString, log);
-                }
-            }
-#endif
             m_warnings.clear();
 
             return SpirV;
@@ -153,21 +104,11 @@ const std::vector<unsigned int> ShaderCompiler::CompileGLSLString(const std::str
             std::string log = Shader.getInfoLog();
             if (!log.empty()) {
                 LogVarWarning("Debug Preprocessing Warnings : %s", log.c_str());
-                m_warnings[shaderType].push_back(log);
+                m_warnings[vShaderType].push_back(log);
                 if (vMessagingFunction) {
                     vMessagingFunction("Preprocessing Warnings", shaderTypeString, log);
                 }
             }
-#ifdef VERBOSE_DEBUG
-            log = Shader.getInfoDebugLog();
-            if (!log.empty()) {
-                LogVarWarning("Debug Preprocessing Warnings : %s", log.c_str());
-                m_warnings[shaderType].push_back(log);
-                if (vMessagingFunction) {
-                    vMessagingFunction("Preprocessing Warnings", shaderTypeString, log);
-                }
-            }
-#endif
         }
 
         const char* PreprocessedCStr = PreprocessedGLSL.c_str();
@@ -179,28 +120,18 @@ const std::vector<unsigned int> ShaderCompiler::CompileGLSLString(const std::str
         Shader.setEntryPoint(entry.c_str());
         Shader.setSourceEntryPoint("main");
 
-        if (!Shader.parse(&glslang::DefaultTBuiltInResource, 100, false, messages)) {
-            LogVarError(
-                "Debug Parse (%s) : GLSL stage %s Parse Failed for stage : %s", entry.c_str(), vShaderSuffix.c_str(), vOriginalFileName.c_str());
+        Shader.setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_0);
 
+        if (!Shader.parse(&glslang::DefaultTBuiltInResource, 100, false, messages)) {
+            LogVarError("Debug Parse (%s) : GLSL stage %s Parse Failed", entry.c_str(), shaderTypeString.c_str());
             std::string log = Shader.getInfoLog();
             if (!log.empty()) {
                 LogVarError("Debug Parse Errors (%s) : %s", entry.c_str(), log.c_str());
-                m_errors[shaderType].push_back(log);
+                m_errors[vShaderType].push_back(log);
                 if (vMessagingFunction) {
                     vMessagingFunction("Parse Parse Errors", shaderTypeString, log);
                 }
             }
-#ifdef VERBOSE_DEBUG
-            log = Shader.getInfoDebugLog();
-            if (!log.empty()) {
-                LogVarError("Debu Parse Errors (%s) : %s", entry.c_str(), log.c_str());
-                m_errors[shaderType].push_back(log);
-                if (vMessagingFunction) {
-                    vMessagingFunction("Parse Errors", shaderTypeString, log);
-                }
-            }
-#endif
             m_warnings.clear();
 
             return SpirV;
@@ -209,48 +140,26 @@ const std::vector<unsigned int> ShaderCompiler::CompileGLSLString(const std::str
             std::string log = Shader.getInfoLog();
             if (!log.empty()) {
                 LogVarWarning("Debug Parse Warnings (%s) : %s", entry.c_str(), log.c_str());
-                m_warnings[shaderType].push_back(log);
+                m_warnings[vShaderType].push_back(log);
                 if (vMessagingFunction) {
                     vMessagingFunction("Parse Warnings", shaderTypeString, log);
                 }
             }
-#ifdef VERBOSE_DEBUG
-            log = Shader.getInfoDebugLog();
-            if (!log.empty()) {
-                LogVarWarning("Debug Parse Warnings (%s) : %s", entry.c_str(), log.c_str());
-                m_warnings[shaderType].push_back(log);
-                if (vMessagingFunction) {
-                    vMessagingFunction("Parse Warnings", shaderTypeString, log);
-                }
-            }
-#endif
         }
 
         glslang::TProgram Program;
         Program.addShader(&Shader);
 
         if (!Program.link(messages)) {
-            LogVarError(
-                "Debug Linking (%s) : GLSL stage %s Linking Failed for : %s", entry.c_str(), vShaderSuffix.c_str(), vOriginalFileName.c_str());
-
+            LogVarError("Debug Linking (%s) : GLSL stage %s Linking Failed", entry.c_str(), shaderTypeString.c_str());
             std::string log = Program.getInfoLog();
             if (!log.empty()) {
                 LogVarDebugInfo("Debug Linking Errors (%s) : %s", entry.c_str(), log.c_str());
-                m_errors[shaderType].push_back(log);
+                m_errors[vShaderType].push_back(log);
                 if (vMessagingFunction) {
                     vMessagingFunction("Linking Errors", shaderTypeString, log);
                 }
             }
-#ifdef VERBOSE_DEBUG
-            log = Program.getInfoDebugLog();
-            if (!log.empty()) {
-                LogVarError("Debug Linking Errors (%s) : %s", entry.c_str(), log.c_str());
-                m_errors[shaderType].push_back(log);
-                if (vMessagingFunction) {
-                    vMessagingFunction("Linking Errors", shaderTypeString, log);
-                }
-            }
-#endif
             m_warnings.clear();
 
             return SpirV;
@@ -259,21 +168,11 @@ const std::vector<unsigned int> ShaderCompiler::CompileGLSLString(const std::str
             std::string log = Shader.getInfoLog();
             if (!log.empty()) {
                 LogVarWarning("Debug Linking Warnings (%s) : %s", entry.c_str(), log.c_str());
-                m_warnings[shaderType].push_back(log);
+                m_warnings[vShaderType].push_back(log);
                 if (vMessagingFunction) {
                     vMessagingFunction("Warnings", shaderTypeString, log);
                 }
             }
-#ifdef VERBOSE_DEBUG
-            log = Shader.getInfoDebugLog();
-            if (!log.empty()) {
-                LogVarWarning("Debug Linking Warnings (%s) : %s", entry.c_str(), log.c_str());
-                m_warnings[shaderType].push_back(log);
-                if (vMessagingFunction) {
-                    vMessagingFunction("Linking Warnings", shaderTypeString, log);
-                }
-            }
-#endif
         }
 
         if (vUsedUniforms) {
@@ -287,12 +186,12 @@ const std::vector<unsigned int> ShaderCompiler::CompileGLSLString(const std::str
         glslang::SpvOptions spvOptions;
         spvOptions.optimizeSize = true;
 #ifdef _DEBUG
-        spvOptions.generateDebugInfo = true;
+        //spvOptions.generateDebugInfo = true;
 #else
         spvOptions.stripDebugInfo = true;
 #endif
 
-        glslang::GlslangToSpv(*Program.getIntermediate(shaderType), SpirV, &logger, &spvOptions);
+        glslang::GlslangToSpv(*Program.getIntermediate(vShaderType), SpirV, &logger, &spvOptions);
 
         if (logger.getAllMessages().length() > 0) {
             std::string allmsgs = logger.getAllMessages();
@@ -301,15 +200,15 @@ const std::vector<unsigned int> ShaderCompiler::CompileGLSLString(const std::str
     }
 
     if (SpirV.empty()) {
-        LogVarError("Debug : Shader stage %s Spirv generation of %s : NOK !", vShaderSuffix.c_str(), vOriginalFileName.c_str());
-    } 
+        LogVarError("Debug : Shader stage %s Spirv generation : NOK !", shaderTypeString.c_str());
+    }
 
     return SpirV;
 }
 
-void ShaderCompiler::ParseGLSLString(const std::string& vCode,
+void ShaderCompiler::ParseGLSLString(
+    const std::string& vCode,
     const std::string& vShaderSuffix,
-    const std::string& vOriginalFileName,
     const ShaderEntryPoint& vEntryPoint,
     ShaderMessagingFunction vMessagingFunction,
     TraverserFunction vTraverser) {
@@ -348,7 +247,7 @@ void ShaderCompiler::ParseGLSLString(const std::string& vCode,
         std::string shaderTypeString = m_getFullShaderStageString(shaderType);
 
         if (!Shader.preprocess(&glslang::DefaultTBuiltInResource, DefaultVersion, ENoProfile, false, false, messages, &PreprocessedGLSL, Includer)) {
-            LogVarError("Debug : GLSL stage %s Preprocessing Failed for : %s", vShaderSuffix.c_str(), vOriginalFileName.c_str());
+            LogVarError("Debug : GLSL stage %s Preprocessing Failed", vShaderSuffix.c_str());
             LogVarError("Debug : %s", Shader.getInfoLog());
             LogVarError("Debug : %s", Shader.getInfoDebugLog());
 
@@ -359,18 +258,7 @@ void ShaderCompiler::ParseGLSLString(const std::string& vCode,
                     vMessagingFunction("Preprocessing Errors", shaderTypeString, log);
                 }
             }
-#ifdef VERBOSE_DEBUG
-            log = Shader.getInfoDebugLog();
-            if (!log.empty()) {
-                m_errors[shaderType].push_back(log);
-                if (vMessagingFunction) {
-                    vMessagingFunction("Preprocessing Errors", shaderTypeString, log);
-                }
-            }
-#endif
             m_warnings.clear();
-
-            // LogVarDebugInfo("Debug : ==========================================");
         } else {
             m_errors.clear();
             std::string log = Shader.getInfoLog();
@@ -380,25 +268,15 @@ void ShaderCompiler::ParseGLSLString(const std::string& vCode,
                     vMessagingFunction("Preprocessing Warnings", shaderTypeString, log);
                 }
             }
-#ifdef VERBOSE_DEBUG
-            log = Shader.getInfoDebugLog();
-            if (!log.empty()) {
-                m_warnings[shaderType].push_back(log);
-                if (vMessagingFunction) {
-                    vMessagingFunction("Preprocessing Warnings", shaderTypeString, log);
-                }
-            }
-#endif
         }
 
         const char* PreprocessedCStr = PreprocessedGLSL.c_str();
         Shader.setStrings(&PreprocessedCStr, 1);
 
         if (!Shader.parse(&glslang::DefaultTBuiltInResource, 100, false, messages)) {
-            LogVarError("Debug : GLSL stage %s Parse Failed for stage : %s", vShaderSuffix.c_str(), vOriginalFileName.c_str());
+            LogVarError("Debug : GLSL stage %s Parse Failed", vShaderSuffix.c_str());
             LogVarError("Debug : %s", Shader.getInfoLog());
             LogVarError("Debug : %s", Shader.getInfoDebugLog());
-
             std::string log = Shader.getInfoLog();
             if (!log.empty()) {
                 m_errors[shaderType].push_back(log);
@@ -406,15 +284,6 @@ void ShaderCompiler::ParseGLSLString(const std::string& vCode,
                     vMessagingFunction("Parse Errors", shaderTypeString, log);
                 }
             }
-#ifdef VERBOSE_DEBUG
-            log = Shader.getInfoDebugLog();
-            if (!log.empty()) {
-                m_errors[shaderType].push_back(log);
-                if (vMessagingFunction) {
-                    vMessagingFunction("Parse Errors", shaderTypeString, log);
-                }
-            }
-#endif
             m_warnings.clear();
         } else {
             m_errors.clear();
@@ -425,15 +294,6 @@ void ShaderCompiler::ParseGLSLString(const std::string& vCode,
                     vMessagingFunction("Parse Warnings", shaderTypeString, log);
                 }
             }
-#ifdef VERBOSE_DEBUG
-            log = Shader.getInfoDebugLog();
-            if (!log.empty()) {
-                m_warnings[shaderType].push_back(log);
-                if (vMessagingFunction) {
-                    vMessagingFunction("Parse Warnings", shaderTypeString, log);
-                }
-            }
-#endif
         }
 
         if (vTraverser) {
@@ -527,3 +387,5 @@ std::string ShaderCompiler::m_getFullShaderStageString(const EShLanguage& stage)
     }
     return "";
 }
+
+}  // namespace ShaderOpt
