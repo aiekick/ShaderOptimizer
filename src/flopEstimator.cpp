@@ -58,7 +58,7 @@ void FlopEstimator::clear() {
     m_stats = {};
 }
 
-FlopEstimator::Stats const& FlopEstimator::stats() const {
+FlopEstimator::OpeStats const& FlopEstimator::stats() const {
     return m_stats;
 }
 
@@ -133,8 +133,11 @@ void FlopEstimator::m_gatherStats(const std::string& text) {
             width = itTy->second.comps;
 
         double flop = scalarCost * width;
-        m_stats.count[key] += 1;
-        m_stats.flops[key] += flop;
+        if (m_stats.ops[key].name.empty()) {
+            m_stats.ops[key].name = key;
+        }
+        m_stats.ops[key].count += 1;
+        m_stats.ops[key].flops += flop;
         m_stats.total += flop;
     }
 }

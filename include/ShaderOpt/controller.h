@@ -21,7 +21,7 @@ public:
     struct Result {
         bool valid{};
         std::string result;
-        FlopEstimator::Stats stats;
+        FlopEstimator::OpeStats stats;
     };
 
 private:

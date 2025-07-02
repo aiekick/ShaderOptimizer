@@ -7,9 +7,13 @@ namespace ShaderOpt {
 
 class FlopEstimator {
 public:
-    struct Stats {
-        std::map<std::string, size_t> count;
-        std::map<std::string, double> flops;
+    struct OpeStats {
+        struct OpeStat {
+            std::string name;
+            size_t count;
+            double flops;
+        };
+        std::map<std::string, OpeStat> ops;
         double total{};
     };
 
@@ -20,12 +24,12 @@ private:
 
 private:
     std::unordered_map<uint32_t, TypeInfo> m_types;
-    Stats m_stats;
+    OpeStats m_stats;
 
 public:
     explicit FlopEstimator(const std::string& vSpirvCode);
     void clear();
-    Stats const& stats() const;
+    OpeStats const& stats() const;
 
 private:
     void m_parseTypes(std::string const& text);
