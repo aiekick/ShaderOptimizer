@@ -1,6 +1,7 @@
 #include <ShaderOpt/controller.h>
 #include <ShaderOpt/resLimits.h>
 #include <ShaderOpt/uniformsIRLocator.h>
+#include <ShaderOpt/spirvOptimizer.h>
 #include <ShaderOpt/flopEstimator.h>
 
 #include <SPIRV/GLSL.std.450.h>
@@ -56,30 +57,34 @@ inline float asFloat(std::uint32_t bits) {
     return value;
 }
 
-Controller::Result Controller::optimize(const Controller::Config& vInfos) {
+Controller::Result Controller::optimize(const Controller::Config& vConfig) {
     try {
         ShaderCompiler compiler;
         Controller::Result ret;
-        if (vInfos.outputType != Config::OutputType::AST) {
-            const auto spirv = compiler.CompileGLSLString(m_sourceCode, EShLangFragment);
-            if (spirv.empty()) {
+        if (vConfig.outputType != Config::OutputType::AST) {
+            const auto spirv_source = compiler.CompileGLSLString(m_sourceCode, EShLangFragment);
+            if (spirv_source.empty()) {
                 return {};
             }
-            switch (vInfos.outputType) {
+            
+            SpirvOptimizer optimizer;
+            const auto spirv_optimized = optimizer.Optimize(spirv_source, vConfig.m_optimizerConfig, SPV_ENV_OPENGL_4_5);
+            
+            switch (vConfig.outputType) {
                 case Config::OutputType::GLSL: {
-                    ret.result = m_convertToGlslCode(spirv);
+                    ret.result = m_convertToGlslCode(spirv_optimized);
                 } break;
                 case Config::OutputType::HLSL: {
-                    ret.result = m_convertToHlslCode(spirv);
+                    ret.result = m_convertToHlslCode(spirv_optimized);
                 } break;
                 case Config::OutputType::MSL: {
-                    ret.result = m_convertToMslCode(spirv);
+                    ret.result = m_convertToMslCode(spirv_optimized);
                 } break;
                 case Config::OutputType::CPP: {
-                    ret.result = m_convertToCppCode(spirv);
+                    ret.result = m_convertToCppCode(spirv_optimized);
                 } break;
                 case Config::OutputType::SPIRV: {
-                    ret.result = m_convertToHumanReadableSpirv(spirv);
+                    ret.result = m_convertToHumanReadableSpirv(spirv_optimized);
                     ret.stats = FlopEstimator(ret.result).stats();
                 } break;
                 case Config::OutputType::Count:
@@ -107,7 +112,7 @@ Controller::Result Controller::optimize(const Controller::Config& vInfos) {
     return {};
 }
 
-std::string Controller::m_convertToHumanReadableSpirv(const ShaderCompiler::SpirvCode& vSpirvCode) {
+std::string Controller::m_convertToHumanReadableSpirv(const SpirvCode& vSpirvCode) {
     std::stringstream ss;
     spv::Disassemble(ss, vSpirvCode);
     // const auto result = ss.str();
@@ -121,7 +126,7 @@ std::string Controller::m_convertToHumanReadableSpirv(const ShaderCompiler::Spir
             std::uint32_t raw = static_cast<std::uint32_t>(std::stoul(m[2]));
             float f = asFloat(raw);
             std::ostringstream oss;
-            oss << std::fixed << std::setprecision(8) << f;
+            oss << std::fixed << std::setprecision(7) << f;
             line += "  (" + oss.str() + ")";
         }
         result += line + "\n";
@@ -129,7 +134,7 @@ std::string Controller::m_convertToHumanReadableSpirv(const ShaderCompiler::Spir
     return result;
 }
 
-std::string Controller::m_convertToGlslCode(const ShaderCompiler::SpirvCode& vSpirvCode) {
+std::string Controller::m_convertToGlslCode(const SpirvCode& vSpirvCode) {
     spirv_cross::CompilerGLSL glsl(vSpirvCode);
 
     // The SPIR-V is now parsed, and we can perform reflection on it.
@@ -158,7 +163,7 @@ std::string Controller::m_convertToGlslCode(const ShaderCompiler::SpirvCode& vSp
     return glsl.compile();
 }
 
-std::string Controller::m_convertToCppCode(const ShaderCompiler::SpirvCode& vSpirvCode) {
+std::string Controller::m_convertToCppCode(const SpirvCode& vSpirvCode) {
     spirv_cross::CompilerCPP cpp(vSpirvCode);
 
     // The SPIR-V is now parsed, and we can perform reflection on it.
@@ -187,7 +192,7 @@ std::string Controller::m_convertToCppCode(const ShaderCompiler::SpirvCode& vSpi
     return cpp.compile();
 }
 
-std::string Controller::m_convertToMslCode(const ShaderCompiler::SpirvCode& vSpirvCode) {
+std::string Controller::m_convertToMslCode(const SpirvCode& vSpirvCode) {
     spirv_cross::CompilerMSL msl(vSpirvCode);
 
     // The SPIR-V is now parsed, and we can perform reflection on it.
@@ -214,7 +219,7 @@ std::string Controller::m_convertToMslCode(const ShaderCompiler::SpirvCode& vSpi
     return msl.compile();
 }
 
-std::string Controller::m_convertToHlslCode(const ShaderCompiler::SpirvCode& vSpirvCode) {
+std::string Controller::m_convertToHlslCode(const SpirvCode& vSpirvCode) {
     spirv_cross::CompilerHLSL hlsl(vSpirvCode);
 
     // The SPIR-V is now parsed, and we can perform reflection on it.

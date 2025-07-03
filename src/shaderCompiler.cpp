@@ -43,7 +43,7 @@ limitations under the License.
 
 namespace ShaderOpt {
 
-ShaderCompiler::SpirvCode ShaderCompiler::CompileGLSLString(
+SpirvCode ShaderCompiler::CompileGLSLString(
     const std::string& vCode,
     const EShLanguage& vShaderType,
     const ShaderEntryPoint& vEntryPoint,
@@ -78,9 +78,7 @@ ShaderCompiler::SpirvCode ShaderCompiler::CompileGLSLString(
 
         EShMessages messages = (EShMessages)(EShMsgDefault);
 
-#ifdef _DEBUG
-        //messages = (EShMessages)(messages | EShMsgDebugInfo);
-#endif
+        messages = (EShMessages)(messages | EShMsgDebugInfo); // garde les nom des symbols
 
         const int DefaultVersion = 110;  // 110 for desktop, 100 for es
 
@@ -195,11 +193,9 @@ ShaderCompiler::SpirvCode ShaderCompiler::CompileGLSLString(
         spv::SpvBuildLogger logger;
         glslang::SpvOptions spvOptions;
         spvOptions.optimizeSize = true;
-#ifdef _DEBUG
-        //spvOptions.generateDebugInfo = true;
-#else
-        spvOptions.stripDebugInfo = true;
-#endif
+        spvOptions.generateDebugInfo = true; // garde un lien avec les noms de variable d'origine
+        spvOptions.emitNonSemanticShaderDebugInfo = true;  // debug complet (lignes, scopes)
+        //spvOptions.stripDebugInfo = true;
 
         glslang::GlslangToSpv(*Program.getIntermediate(vShaderType), SpirV, &logger, &spvOptions);
 

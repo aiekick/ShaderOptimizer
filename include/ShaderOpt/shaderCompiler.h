@@ -17,6 +17,7 @@ limitations under the License.
 #pragma once
 #pragma warning(disable : 4251)
 
+#include <ShaderOpt/defs.h>
 #include <glslang/Public/ShaderLang.h>
 #include <glslang/Include/intermediate.h>
 
@@ -42,7 +43,6 @@ class ShaderCompiler {
 public:
     typedef std::function<void(std::string, std::string, std::string)> ShaderMessagingFunction;
     typedef std::function<void(glslang::TIntermediate*)> TraverserFunction;
-    typedef std::vector<uint32_t> SpirvCode;
     typedef std::unordered_map<EShLanguage, std::vector<std::string>> ShaderInfos;
 
 private:

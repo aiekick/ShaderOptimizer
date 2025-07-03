@@ -1,6 +1,7 @@
 #pragma once
 #include <ShaderOpt/shaderCompiler.h>
 #include <ShaderOpt/flopEstimator.h>
+#include <ShaderOpt/spirvOptimizer.h>
 #include <string>
 
 namespace ShaderOpt {
@@ -17,6 +18,7 @@ public:
             CPP,
             Count
         } outputType = OutputType::GLSL;
+        SpirvOptimizer::Config m_optimizerConfig;
     };
     struct Result {
         bool valid{};
@@ -39,11 +41,11 @@ public:
     Controller::Result optimize(const Controller::Config &vInfos);
 
 private:
-    std::string m_convertToHumanReadableSpirv(const ShaderCompiler::SpirvCode &vSpirvCode);
-    std::string m_convertToGlslCode(const ShaderCompiler::SpirvCode &vSpirvCode);
-    std::string m_convertToCppCode(const ShaderCompiler::SpirvCode &vSpirvCode);
-    std::string m_convertToMslCode(const ShaderCompiler::SpirvCode &vSpirvCode);
-    std::string m_convertToHlslCode(const ShaderCompiler::SpirvCode &vSpirvCode);
+    std::string m_convertToHumanReadableSpirv(const SpirvCode &vSpirvCode);
+    std::string m_convertToGlslCode(const SpirvCode &vSpirvCode);
+    std::string m_convertToCppCode(const SpirvCode &vSpirvCode);
+    std::string m_convertToMslCode(const SpirvCode &vSpirvCode);
+    std::string m_convertToHlslCode(const SpirvCode &vSpirvCode);
 };
 
 }  // namespace ShaderOpt
