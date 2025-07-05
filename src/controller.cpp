@@ -60,16 +60,16 @@ inline float asFloat(std::uint32_t bits) {
 Controller::Result Controller::optimize(const Controller::Config& vConfig) {
     try {
         ShaderCompiler compiler;
+        ShaderCompiler::Config shaderConfig;
+        shaderConfig.debug = vConfig.debug;
         Controller::Result ret;
         if (vConfig.outputType != Config::OutputType::AST) {
-            const auto spirv_source = compiler.CompileGLSLString(m_sourceCode, EShLangFragment);
+            const auto spirv_source = compiler.CompileGLSLString(m_sourceCode, EShLangFragment, shaderConfig);
             if (spirv_source.empty()) {
                 return {};
             }
-            
             SpirvOptimizer optimizer;
             const auto spirv_optimized = optimizer.Optimize(spirv_source, vConfig.m_optimizerConfig, SPV_ENV_OPENGL_4_5);
-            
             switch (vConfig.outputType) {
                 case Config::OutputType::GLSL: {
                     ret.result = m_convertToGlslCode(spirv_optimized);
@@ -92,7 +92,7 @@ Controller::Result Controller::optimize(const Controller::Config& vConfig) {
             }
         } else {
             TInfoSink sink;
-            compiler.CompileGLSLString(m_sourceCode, EShLangFragment, "main", nullptr, [&](glslang::TIntermediate* vIt) {
+            compiler.CompileGLSLString(m_sourceCode, EShLangFragment, shaderConfig, "main", nullptr, [&](glslang::TIntermediate* vIt) {
                 if (vIt != nullptr) {
                     vIt->output(sink, true);
                 }

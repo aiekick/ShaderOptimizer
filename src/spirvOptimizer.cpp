@@ -27,41 +27,49 @@ SpirvCode const& SpirvOptimizer::Optimize(const SpirvCode& vSpirv, const SpirvOp
             } break;
         }
     });
+
     optimizer.SetValidateAfterAll(true);
 
     spvtools::ValidatorOptions validator_options;
+    validator_options.SetFriendlyNames(true);
+
     spvtools::OptimizerOptions optimizer_options;
 
 
     optimizer_options.set_validator_options(validator_options);
 
-    //optimizer.RegisterPass(Optimizer::PassToken(spvtools::CreateInlineExhaustivePass()));
-    //optimizer.RegisterPass(Optimizer::PassToken(spvtools::CreateSimplificationPass()));
-    //optimizer.RegisterPerformancePasses();  // équivalent à -O
-    //optimizer.RegisterSizePasses();         // équivalent à -Os
 
     bool preserve_interface = false; // false:perf, true:size
+    bool preserve_outputs = false;  // false:perf, true:size
 
-    //optimizer.RegisterPerformancePasses();  // équivalent à -O
+    optimizer.RegisterPerformancePasses(); // équivalent à -O
+    optimizer.RegisterSizePasses();         // équivalent à -Os
     
+    bool authorizeDcePass = false;
+
+    /* 
     optimizer.RegisterPass(CreateWrapOpKillPass());
     optimizer.RegisterPass(CreateDeadBranchElimPass());
     optimizer.RegisterPass(CreateMergeReturnPass());
     optimizer.RegisterPass(CreateInlineExhaustivePass());
     optimizer.RegisterPass(CreateEliminateDeadFunctionsPass());
-    optimizer.RegisterPass(CreateAggressiveDCEPass(preserve_interface));
+    if (authorizeDcePass)
+        optimizer.RegisterPass(CreateAggressiveDCEPass(preserve_interface, preserve_outputs));
     optimizer.RegisterPass(CreatePrivateToLocalPass());
     optimizer.RegisterPass(CreateLocalSingleBlockLoadStoreElimPass());
     optimizer.RegisterPass(CreateLocalSingleStoreElimPass());
-    optimizer.RegisterPass(CreateAggressiveDCEPass(preserve_interface));
+    if (authorizeDcePass)
+        optimizer.RegisterPass(CreateAggressiveDCEPass(preserve_interface, preserve_outputs));
     optimizer.RegisterPass(CreateScalarReplacementPass(0));
     optimizer.RegisterPass(CreateLocalAccessChainConvertPass());
     optimizer.RegisterPass(CreateLocalSingleBlockLoadStoreElimPass());
     optimizer.RegisterPass(CreateLocalSingleStoreElimPass());
     optimizer.RegisterPass(CreateLocalMultiStoreElimPass());
-    optimizer.RegisterPass(CreateAggressiveDCEPass(preserve_interface));
+    if (authorizeDcePass)
+        optimizer.RegisterPass(CreateAggressiveDCEPass(preserve_interface, preserve_outputs));
     optimizer.RegisterPass(CreateCCPPass());
-    optimizer.RegisterPass(CreateAggressiveDCEPass(preserve_interface));
+    if (authorizeDcePass)
+        optimizer.RegisterPass(CreateAggressiveDCEPass(preserve_interface, preserve_outputs));
     optimizer.RegisterPass(CreateLoopUnrollPass(true));
     optimizer.RegisterPass(CreateDeadBranchElimPass());
     optimizer.RegisterPass(CreateRedundancyEliminationPass());
@@ -71,9 +79,11 @@ SpirvCode const& SpirvOptimizer::Optimize(const SpirvCode& vSpirv, const SpirvOp
     optimizer.RegisterPass(CreateLocalAccessChainConvertPass());
     optimizer.RegisterPass(CreateLocalSingleBlockLoadStoreElimPass());
     optimizer.RegisterPass(CreateLocalSingleStoreElimPass());
-    optimizer.RegisterPass(CreateAggressiveDCEPass(preserve_interface));
+    if (authorizeDcePass)
+        optimizer.RegisterPass(CreateAggressiveDCEPass(preserve_interface, preserve_outputs));
     optimizer.RegisterPass(CreateSSARewritePass());
-    optimizer.RegisterPass(CreateAggressiveDCEPass(preserve_interface));
+    if (authorizeDcePass)
+        optimizer.RegisterPass(CreateAggressiveDCEPass(preserve_interface, preserve_outputs));
     optimizer.RegisterPass(CreateVectorDCEPass());
     optimizer.RegisterPass(CreateDeadInsertElimPass());
     optimizer.RegisterPass(CreateDeadBranchElimPass());
@@ -81,16 +91,19 @@ SpirvCode const& SpirvOptimizer::Optimize(const SpirvCode& vSpirv, const SpirvOp
     optimizer.RegisterPass(CreateIfConversionPass());
     optimizer.RegisterPass(CreateCopyPropagateArraysPass());
     optimizer.RegisterPass(CreateReduceLoadSizePass());
-    optimizer.RegisterPass(CreateAggressiveDCEPass(preserve_interface));
+    if (authorizeDcePass)
+        optimizer.RegisterPass(CreateAggressiveDCEPass(preserve_interface, preserve_outputs));
     optimizer.RegisterPass(CreateBlockMergePass());
     optimizer.RegisterPass(CreateRedundancyEliminationPass());
     optimizer.RegisterPass(CreateDeadBranchElimPass());
     optimizer.RegisterPass(CreateBlockMergePass());
     optimizer.RegisterPass(CreateSimplificationPass());
-    
+    */
+
     if (optimizer.Run(m_source.data(), m_source.size(), &m_target, optimizer_options)) {
         return m_target;
     }
+
     return m_source;
 }
 

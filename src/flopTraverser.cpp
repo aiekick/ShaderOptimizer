@@ -70,7 +70,9 @@ bool FlopTraverser::visitAggregate(TVisit, TIntermAggregate* node) {
 bool FlopTraverser::visitSelection(TVisit pre, TIntermSelection* node) {
     if (pre == EvPreVisit) {
         m_pathCost.push(0);  // coût accumulé dans « then »
-        node->getTrueBlock()->traverse(this);
+        if (node->getTrueBlock()) {
+            node->getTrueBlock()->traverse(this);
+        }
         double thenCost = m_pathCost.top();
         m_pathCost.pop();
 

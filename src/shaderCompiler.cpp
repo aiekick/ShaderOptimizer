@@ -46,6 +46,7 @@ namespace ShaderOpt {
 SpirvCode ShaderCompiler::CompileGLSLString(
     const std::string& vCode,
     const EShLanguage& vShaderType,
+    const Config& vConfig, 
     const ShaderEntryPoint& vEntryPoint,
     ShaderMessagingFunction vMessagingFunction,
     TraverserFunction vTraverser,
@@ -77,8 +78,9 @@ SpirvCode ShaderCompiler::CompileGLSLString(
         Shader.setStrings(&InputCString, 1);
 
         EShMessages messages = (EShMessages)(EShMsgDefault);
-
-        messages = (EShMessages)(messages | EShMsgDebugInfo); // garde les nom des symbols
+        if (vConfig.debug) {
+            messages = (EShMessages)(messages | EShMsgDebugInfo);  // garde les nom des symbols
+        }
 
         const int DefaultVersion = 110;  // 110 for desktop, 100 for es
 
@@ -193,9 +195,12 @@ SpirvCode ShaderCompiler::CompileGLSLString(
         spv::SpvBuildLogger logger;
         glslang::SpvOptions spvOptions;
         spvOptions.optimizeSize = true;
-        spvOptions.generateDebugInfo = true; // garde un lien avec les noms de variable d'origine
-        spvOptions.emitNonSemanticShaderDebugInfo = true;  // debug complet (lignes, scopes)
-        //spvOptions.stripDebugInfo = true;
+        if (vConfig.debug) {
+            spvOptions.generateDebugInfo = true;               // garde un lien avec les noms de variable d'origine
+            spvOptions.emitNonSemanticShaderDebugInfo = true;  // debug complet (lignes, scopes)
+        } else {
+            spvOptions.stripDebugInfo = true;
+        }
 
         glslang::GlslangToSpv(*Program.getIntermediate(vShaderType), SpirV, &logger, &spvOptions);
 

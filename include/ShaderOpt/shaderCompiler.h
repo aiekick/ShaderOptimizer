@@ -44,6 +44,9 @@ public:
     typedef std::function<void(std::string, std::string, std::string)> ShaderMessagingFunction;
     typedef std::function<void(glslang::TIntermediate*)> TraverserFunction;
     typedef std::unordered_map<EShLanguage, std::vector<std::string>> ShaderInfos;
+    struct Config {
+        bool debug = false;
+    };
 
 private:
     ShaderInfos m_errors;
@@ -53,6 +56,7 @@ public:
     SpirvCode CompileGLSLString(
         const std::string& vCode,
         const EShLanguage& vShaderType,
+        const Config& vConfig, 
         const ShaderEntryPoint& vEntryPoint = "main",
         ShaderMessagingFunction vMessagingFunction = nullptr,
         TraverserFunction vTraverser = nullptr,

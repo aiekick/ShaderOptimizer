@@ -18,6 +18,7 @@ public:
             CPP,
             Count
         } outputType = OutputType::GLSL;
+        bool debug = false;
         SpirvOptimizer::Config m_optimizerConfig;
     };
     struct Result {
